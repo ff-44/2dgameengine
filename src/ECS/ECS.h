@@ -10,8 +10,17 @@ const unsigned int MAX_COMPONENTS = 32;
 // and also helps keep track of which entities the system is interesting
 typedef std::bitset<MAX_COMPONENTS> Signature;
 
-class Component {
+struct IComponent {
+    protected:
+        static int nextId;
+};
 
+template <typename T>
+class Component: public IComponent {
+    static int GetId() {
+        static auto id = nextId++;
+        return id;
+    }
 };
 
 class Entity {
@@ -35,11 +44,19 @@ class System {
         void AddEntityToSystem(Entity entity);
         void RemoveEntityFromSystem(Entity entity);
         std::vector<Entity> GetSystemEntities() const;
-        Signature& GetComponentSignature() const;
+        const Signature& GetComponentSignature() const;
+
+        template <typename TComponent> void RequireComponent();
 };
 
 class Registry {
 
+};
+
+template <typename TComponent>
+void System::RequireComponent() {
+    const auto componentId = Component<TComponent>::GetId();
+    componentSignature.set(componentId);
 };
 
 #endif
