@@ -11,7 +11,7 @@ void System::AddEntityToSystem(Entity entity) {
 
 void System::RemoveEntityFromSystem(Entity entity) {
     for (int i=0; i < entities.size(); ++i) {
-        if (entities[i].GetId() == entity.GetId()) {
+        if (entities[i] == entity) {
             entities.erase(entities.begin() + i);
         }
     }

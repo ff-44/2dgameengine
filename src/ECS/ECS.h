@@ -30,6 +30,8 @@ class Entity {
     public:
         Entity(int id): id(id) {};
         int GetId() const;
+
+        bool operator == (const Entity& other) const { return id == other.id; };
 };
 
 class System {
@@ -49,8 +51,62 @@ class System {
         template <typename TComponent> void RequireComponent();
 };
 
-class Registry {
+class IPool {
+    public:
+        virtual ~IPool() {}
+};
 
+template <typename T>
+class Pool: IPool {
+    private:
+        std::vector<T> data;
+    
+    public:
+        Pool(int size = 100) {
+            data.resize(size);
+        }
+        virtual ~Pool() = default;
+
+        bool isEmpty() const {
+            return data.empty();
+        }
+
+        int GetSize() const {
+            return data.size();
+        }
+
+        void Resize(int n) {
+            data.resize(n);
+        }
+
+        void Clear() {
+            data.clear();
+        }
+
+        void Add(T object) {
+            data.push_back(object);
+        }
+
+        void Set(int index, T object) {
+            data[index] = object;
+        }
+
+        T& Get(int index) {
+            return static_cast<T&>(data[index]);
+        }
+
+        T& operator [](unsigned int index) {
+            return data[index];
+        }
+};
+
+class Registry {
+    private:
+        int numEntitites = 0;
+        
+        // Vector index is component type id
+        // Pool index = entity id
+        std::vector<Pool*> componentPools;
 };
 
 template <typename TComponent>
