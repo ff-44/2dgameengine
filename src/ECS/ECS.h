@@ -3,6 +3,9 @@
 
 #include <bitset>
 #include <vector>
+#include <set>
+#include <unordered_map>
+#include <typeindex>
 
 const unsigned int MAX_COMPONENTS = 32;
 
@@ -106,13 +109,52 @@ class Registry {
         
         // Vector index is component type id
         // Pool index = entity id
-        std::vector<Pool*> componentPools;
+        std::vector<IPool*> componentPools;
+
+        std::vector<Signature> entityComponentSignatures;
+
+        std::unordered_map<std::type_index, System*> systems;
+
+        std::set<Entity> entitiesTobeAdded;
+        std::set<Entity> entitiesToBeKilled;
+
+    public:
+        Registry() = default;
+
+        void Update();
+
+        Entity CreateEntity();
+
+        void AddEntityToSystem(Entity entity);
+
+        template<typename T, typename ...TArgs> void AddComponent(Entity entity, TArgs&& ...args);
 };
 
 template <typename TComponent>
 void System::RequireComponent() {
     const auto componentId = Component<TComponent>::GetId();
     componentSignature.set(componentId);
+};
+
+template<typename T, typename ...TArgs>
+void Registry::AddComponent(Entity entity, TArgs&& ...args) {
+    const auto componentId = Component<T>::GetId();
+    const auto entityId = entity.GetId();
+
+    if (componentId >= componentPools.size()) {
+        componentPools.resize(componentId + 1, nullptr_t);
+    }
+
+    if (!componentPools[componentId]) {
+        Poo<T>* newComponentPool = new Pool<T>();
+        componentPools[componentId] = newComponentPool;
+    }
+
+    Poo<T> componentPool = Pool<T>(componentPools[componentId]);
+
+    if (entityid >= componentPool->GetSize()) {
+        componentPool->Resize(numEntitites);
+    }
 };
 
 #endif
