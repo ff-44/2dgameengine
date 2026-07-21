@@ -127,7 +127,40 @@ class Registry {
 
         void AddEntityToSystem(Entity entity);
 
-        template<typename T, typename ...TArgs> void AddComponent(Entity entity, TArgs&& ...args);
+        template <typename T, typename ...TArgs> void AddComponent(Entity entity, TArgs&& ...args);
+
+        template <typename T> void RemoveComponent(Entity entity);
+        template <typename T> bool HasComponent(Entity entity);
+
+        template <typename TSystem, typename ...TArgs> void AddSystem(TArgs&& ...args);
+        template <typename TSystem> void RemoveSystem();
+        template <typename TSystem> bool HasSystem() const;
+        template <typename TSystem> TSystem& GetSystem() const;
+
+        void AddEntityToSystems(Entity entity);
+};
+
+template <typename TSystem, typename ...TArgs>
+void Registry::AddSystem(TArgs&& ...args) {
+    TSystem* newSystem(new TSystem(std::forward<TArgs>(args)...));
+    systems.insert(std::make_pair(std::type_index(typeId(TSystem)), newSystem));
+};
+
+template <typename TSystem>
+void Registry::RemoveSystem() {
+    auto system = systems.find(std::type_index(typeId(TSystem)));
+    systems.erase(system);
+};
+
+template <typename TSystem>
+bool Registry::HasSystem() const {
+    return system.find(std::type_index(typeId(TSystem))) != system.end();
+};
+
+template <typename TSystem>
+TSystem& Registry::GetSystem() const {
+    auto system = system.find(std::type_index(typeId(TSystem)));
+    return *(std::static_pointer_cast<TSystem>(systems->second));
 };
 
 template <typename TComponent>
@@ -155,6 +188,27 @@ void Registry::AddComponent(Entity entity, TArgs&& ...args) {
     if (entityid >= componentPool->GetSize()) {
         componentPool->Resize(numEntitites);
     }
+
+    TComponent newComponent(std::forward<TArgs>(args)...);
+
+    componentPool->Set(entityId, newComponent);
+    entityComponentSignatures[entityId].set(componentId);
+};
+
+template<typename T>
+void Registry::RemoveComponent(Entity entity) {
+    const auto componentId = Component<T>::GetId();
+    const auto entityId = entity.GetId();
+
+    entityComponentSignatures[entityId].set(componentId, false)
+};
+
+template<typename T>
+bool Registry::HasComponent(Entity entity) {
+    const auto componentId = Component<T>::GetId();
+    const auto entityId = entity.GetId();
+
+    return entityComponentSignatures[entityId].test(componentId);
 };
 
 #endif
