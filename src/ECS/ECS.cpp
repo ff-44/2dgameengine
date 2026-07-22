@@ -1,6 +1,7 @@
 #include "ECS.h"
 #include "../Logger/Logger.h"
 #include <iostream>
+#include <algorithm>
 
 int IComponent::nextId = 0;
 
@@ -13,12 +14,14 @@ void System::AddEntityToSystem(Entity entity) {
 };
 
 void System::RemoveEntityFromSystem(Entity entity) {
-    for (int i=0; i < entities.size(); ++i) {
-        if (entities[i] == entity) {
-            entities.erase(entities.begin() + i);
-        }
-    }
-    // entities.erase(std::remove_if(entitites.being(), entities.end(), [&entity](Entity other) { return entity.GetId() == other.GetId(); }), entity.end());
+    // for (int i=0; i < entities.size(); ++i) {
+    //     if (entities[i] == entity) {
+    //         entities.erase(entities.begin() + i);
+    //     }
+    // }
+    entities.erase(std::remove_if(entities.begin(), entities.end(), [&entity](Entity other) {
+        return entity == other;
+    }), entities.end());
 };
 
 
@@ -38,7 +41,11 @@ Entity Registry::CreateEntity() {
     Entity entity(entityId);
     entitiesTobeAdded.insert(entity);
 
-    Logger::Log("Entity created with id =" + std::to_string(entityId));
+    if (entityId >= static_cast<int>(entityComponentSignatures.size())) {
+        entityComponentSignatures.resize(entityId + 1);
+    }
+
+    Logger::Log("Entity created with id = " + std::to_string(entityId));
 
     return entity;
 };
@@ -60,5 +67,10 @@ void Registry::AddEntityToSystems(Entity entity) {
 };
 
 void Registry::Update() {
+    for (auto entity: entitiesTobeAdded) {
+        AddEntityToSystems(entity);
+    }
+
+    entitiesTobeAdded.clear();
 
 };

@@ -1,11 +1,13 @@
 #ifndef ECS_H
 #define ECS_H
 
-#include <bitset>
+#include "../Logger/Logger.h"
 #include <vector>
+#include <bitset>
 #include <set>
 #include <unordered_map>
 #include <typeindex>
+#include <memory>
 
 const unsigned int MAX_COMPONENTS = 32;
 
@@ -20,10 +22,11 @@ struct IComponent {
 
 template <typename T>
 class Component: public IComponent {
-    static int GetId() {
-        static auto id = nextId++;
-        return id;
-    }
+    public:
+        static int GetId() {
+            static auto id = nextId++;
+            return id;
+        }
 };
 
 class Entity {
@@ -34,7 +37,11 @@ class Entity {
         Entity(int id): id(id) {};
         int GetId() const;
 
-        bool operator == (const Entity& other) const { return id == other.id; };
+        Entity& operator =(const Entity& other) = default;
+        bool operator ==(const Entity& other) const { return id == other.id; };
+        bool operator !=(const Entity& other) const { return id != other.id; }
+        bool operator >(const Entity& other) const { return id > other.id; }
+        bool operator <(const Entity& other) const { return id < other.id; }
 };
 
 class System {
@@ -60,7 +67,7 @@ class IPool {
 };
 
 template <typename T>
-class Pool: IPool {
+class Pool: public IPool {
     private:
         std::vector<T> data;
     
@@ -109,17 +116,18 @@ class Registry {
         
         // Vector index is component type id
         // Pool index = entity id
-        std::vector<IPool*> componentPools;
+        std::vector<std::shared_ptr<IPool>> componentPools;
 
         std::vector<Signature> entityComponentSignatures;
 
-        std::unordered_map<std::type_index, System*> systems;
+        std::unordered_map<std::type_index, std::shared_ptr<System>> systems;
 
         std::set<Entity> entitiesTobeAdded;
         std::set<Entity> entitiesToBeKilled;
 
     public:
-        Registry() = default;
+        Registry() { Logger::Log("Registry constructor called"); }
+        ~Registry() { Logger::Log("Registry desctructor called"); }
 
         void Update();
 
@@ -142,25 +150,25 @@ class Registry {
 
 template <typename TSystem, typename ...TArgs>
 void Registry::AddSystem(TArgs&& ...args) {
-    TSystem* newSystem(new TSystem(std::forward<TArgs>(args)...));
-    systems.insert(std::make_pair(std::type_index(typeId(TSystem)), newSystem));
+    std::shared_ptr<TSystem> newSystem = std::make_shared<TSystem>(std::forward<TArgs>(args)...);
+    systems.insert(std::make_pair(std::type_index(typeid(TSystem)), newSystem));
 };
 
 template <typename TSystem>
 void Registry::RemoveSystem() {
-    auto system = systems.find(std::type_index(typeId(TSystem)));
+    auto system = systems.find(std::type_index(typeid(TSystem)));
     systems.erase(system);
 };
 
 template <typename TSystem>
 bool Registry::HasSystem() const {
-    return system.find(std::type_index(typeId(TSystem))) != system.end();
+    return systems.find(std::type_index(typeid(TSystem))) != systems.end();
 };
 
 template <typename TSystem>
 TSystem& Registry::GetSystem() const {
-    auto system = system.find(std::type_index(typeId(TSystem)));
-    return *(std::static_pointer_cast<TSystem>(systems->second));
+    auto system = systems.find(std::type_index(typeid(TSystem)));
+    return *(std::static_pointer_cast<TSystem>(system->second));
 };
 
 template <typename TComponent>
@@ -174,25 +182,27 @@ void Registry::AddComponent(Entity entity, TArgs&& ...args) {
     const auto componentId = Component<T>::GetId();
     const auto entityId = entity.GetId();
 
-    if (componentId >= componentPools.size()) {
-        componentPools.resize(componentId + 1, nullptr_t);
+    if (componentId >= static_cast<int>(componentPools.size())) {
+        componentPools.resize(componentId + 1, nullptr);
     }
 
     if (!componentPools[componentId]) {
-        Poo<T>* newComponentPool = new Pool<T>();
+        std::shared_ptr<Pool<T>> newComponentPool = std::make_shared<Pool<T>>();
         componentPools[componentId] = newComponentPool;
     }
 
-    Poo<T> componentPool = Pool<T>(componentPools[componentId]);
+    std::shared_ptr<Pool<T>> componentPool = std::static_pointer_cast<Pool<T>>(componentPools[componentId]);
 
-    if (entityid >= componentPool->GetSize()) {
+    if (entityId >= componentPool->GetSize()) {
         componentPool->Resize(numEntitites);
     }
 
-    TComponent newComponent(std::forward<TArgs>(args)...);
+    T newComponent(std::forward<TArgs>(args)...);
 
     componentPool->Set(entityId, newComponent);
     entityComponentSignatures[entityId].set(componentId);
+
+    Logger::Log("Component id = " + std::to_string(componentId) + " was added to entity id " + std::to_string(entityId));
 };
 
 template<typename T>
@@ -200,7 +210,7 @@ void Registry::RemoveComponent(Entity entity) {
     const auto componentId = Component<T>::GetId();
     const auto entityId = entity.GetId();
 
-    entityComponentSignatures[entityId].set(componentId, false)
+    entityComponentSignatures[entityId].set(componentId, false);
 };
 
 template<typename T>
