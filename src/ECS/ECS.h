@@ -38,10 +38,18 @@ class Entity {
         int GetId() const;
 
         Entity& operator =(const Entity& other) = default;
-        bool operator ==(const Entity& other) const { return id == other.id; };
+        bool operator ==(const Entity& other) const { return id == other.id; }
         bool operator !=(const Entity& other) const { return id != other.id; }
         bool operator >(const Entity& other) const { return id > other.id; }
         bool operator <(const Entity& other) const { return id < other.id; }
+
+        template <typename TComponent, typename ...TArgs> void AddComponent(TArgs&& ...args);
+        template <typename TComponent> void RemoveComponent();
+        template <typename TComponent> bool HasComponent() const;
+        template <typename TComponent> TComponent& GetComponent() const;
+
+        // A pointer to the entity's owner registry
+        class Registry* registry;
 };
 
 class System {
@@ -66,6 +74,9 @@ class IPool {
         virtual ~IPool() {}
 };
 
+/**
+ * Template of IPool class with the following method to manage pools
+ */
 template <typename T>
 class Pool: public IPool {
     private:
@@ -139,6 +150,7 @@ class Registry {
 
         template <typename T> void RemoveComponent(Entity entity);
         template <typename T> bool HasComponent(Entity entity);
+        template <typename T> T& GetComponent(Entity entity) const;
 
         template <typename TSystem, typename ...TArgs> void AddSystem(TArgs&& ...args);
         template <typename TSystem> void RemoveSystem();
@@ -148,6 +160,14 @@ class Registry {
         void AddEntityToSystems(Entity entity);
 };
 
+
+/**
+ * Systems method of the registry to
+ * add system
+ * remove system
+ * check if the system exists
+ * get a system
+ */
 template <typename TSystem, typename ...TArgs>
 void Registry::AddSystem(TArgs&& ...args) {
     std::shared_ptr<TSystem> newSystem = std::make_shared<TSystem>(std::forward<TArgs>(args)...);
@@ -177,6 +197,15 @@ void System::RequireComponent() {
     componentSignature.set(componentId);
 };
 
+/**
+ * Methods for the registry to
+ * add component to the entity
+ * remove component from the entity
+ * check if the entity has a component
+ * get a component
+ * 
+ * This methods will be reused by the Entity class
+ */
 template<typename T, typename ...TArgs>
 void Registry::AddComponent(Entity entity, TArgs&& ...args) {
     const auto componentId = Component<T>::GetId();
@@ -211,6 +240,8 @@ void Registry::RemoveComponent(Entity entity) {
     const auto entityId = entity.GetId();
 
     entityComponentSignatures[entityId].set(componentId, false);
+
+    Logger::Log("Component id " + std::to_string(componentId) + " was removed from the entity id " + std::to_string(entityId));
 };
 
 template<typename T>
@@ -219,6 +250,41 @@ bool Registry::HasComponent(Entity entity) {
     const auto entityId = entity.GetId();
 
     return entityComponentSignatures[entityId].test(componentId);
+};
+
+template<typename T>
+T& Registry::GetComponent(Entity entity) const {
+    const auto componentId = Component<T>::GetId();
+    const auto entityId = entity.GetId();
+    auto componentPool = std::static_pointer_cast<Pool<T>>(componentPools[componentId]);
+    return componentPool->Get(entityId);
+};
+
+/**
+ * Entities mothod to
+ * add component to an entity
+ * remove component from the entity
+ * check if the entity has a component
+ * get component of the entity
+ */
+template<typename TComponent, typename ...TArgs>
+void Entity::AddComponent(TArgs&& ...args) {
+    registry->AddComponent<TComponent>(*this, std::forward<TArgs>(args)...);
+};
+
+template<typename TComponent>
+void Entity::RemoveComponent() {
+    registry->RemoveComponent<TComponent>(*this);
+};
+
+template<typename TComponent>
+bool Entity::HasComponent() const {
+    return registry->HasComponent<TComponent>(*this);
+};
+
+template<typename TComponent>
+TComponent& Entity::GetComponent() const {
+    return registry->GetComponent<TComponent>(*this);
 };
 
 #endif

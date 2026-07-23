@@ -3,6 +3,7 @@
 #include "../ECS/ECS.h"
 #include "../Components/TransformComponent.h"
 #include "../Components/RigidBodyComponent.h"
+#include "../System/MovementSystem.h"
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL.h>
 #include <glm/glm.hpp>
@@ -65,6 +66,8 @@ void Game::ProcessInput() {
 }
 
 void Game::Setup() {
+    registry->AddSystem<MovementSystem>();
+
     // TODO:
     // Entity tank = registry.CreateEntityu();
     // tank.AddComponent<TransformComponent>();
@@ -72,8 +75,9 @@ void Game::Setup() {
     // tank.AddComponent<SpriteComponent>("./assets/image/tank.png");
     Entity tank = registry->CreateEntity();
 
-    registry->AddComponent<TransformComponent>(tank, glm::vec2(10.0, 20.0), glm::vec2(1.0, 1.0), 0.0);
-    registry->AddComponent<RigidBodyComponent>(tank, glm::vec2(50.0, 0.0));
+    tank.AddComponent<TransformComponent>(glm::vec2(10.0, 20.0), glm::vec2(1.0, 1.0), 0.0);
+    tank.AddComponent<RigidBodyComponent>(glm::vec2(50.0, 10.0));
+    // tank.RemoveComponent<TransformComponent>();
 }
 
 void Game::Update() {
@@ -84,11 +88,9 @@ void Game::Update() {
     // Store the current frame time
     milisecsPreviousFrame = SDL_GetTicks();
 
-    // TODO:
-    // MovementSystem.Update();
-    // ColissionSystem.Update();
-    // DemageSystem.Update();
+    registry->GetSystem<MovementSystem>().Update(deltaTime);
 
+    registry->Update();
 }
 
 void Game::Render() {
